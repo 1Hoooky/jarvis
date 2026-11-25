@@ -179,7 +179,8 @@ function score(v: SpeechSynthesisVoice): number {
 
   // The macOS British male, and the closest thing to the character available
   // without leaving the machine.
-  if (n.startsWith('daniel')) s += 100
+  if (/^pt/i.test(v.lang) && n.includes('google')) s += 150
+  else if (n.includes('daniel')) s += 100
   else if (n.includes('google uk english male')) s += 85
   else if (/\b(oliver|arthur|jamie|malcolm)\b/.test(n)) s += 80
   // Newer macOS en-GB male voices — casual, but serviceable.
@@ -190,7 +191,9 @@ function score(v: SpeechSynthesisVoice): number {
   else if (n.includes('enhanced')) s += 20
 
   if (/en[-_]gb/i.test(v.lang)) s += 25
+  else if (/pt[-_]br/i.test(v.lang)) s += 25
   else if (/^en/i.test(v.lang)) s += 5
+  else if (/^pt/i.test(v.lang)) s += 5
 
   // Voices that clearly aren't a butler.
   if (/grandma|grandpa|bubbles|jester|bells|boing|whisper|zarvox|superstar|trinoids|wobble|bahh|organ|cellos|bad news|good news/.test(n)) {
@@ -212,7 +215,7 @@ const USABLE = 40
 export function candidateVoices(): SpeechSynthesisVoice[] {
   return speechSynthesis
     .getVoices()
-    .filter((v) => /^en/i.test(v.lang))
+    .filter((v) => /^(en|pt)/i.test(v.lang))
     .map((v) => ({ v, s: score(v) }))
     .filter((x) => x.s >= USABLE)
     .sort((a, b) => b.s - a.s)
@@ -236,7 +239,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
     localStorage.removeItem(VOICE_PREF_KEY)
   }
 
-  cachedVoice = candidateVoices()[0] ?? all.find((v) => /^en/i.test(v.lang)) ?? null
+  cachedVoice = candidateVoices()[0] ?? all.find((v) => /^pt/i.test(v.lang)) ?? all.find((v) => /^en/i.test(v.lang)) ?? null
   return cachedVoice
 }
 
@@ -477,7 +480,7 @@ export function createSpeaker(): Speaker {
       const u = new SpeechSynthesisUtterance(text)
       const voice = pickVoice()
       if (voice) u.voice = voice
-      u.lang = voice?.lang ?? 'en-GB'
+      u.lang = voice?.lang ?? 'pt-BR'
       // Deliberate, and deliberately invariant — the character's pace does not
       // change with stakes, and that steadiness is most of the effect. This
       // lands around 130 wpm, below the median for film dialogue.

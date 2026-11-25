@@ -21,6 +21,7 @@ import { displayServer } from './panels.mjs'
 import { uiServer } from './ui.mjs'
 import { chromeAvailable, chromeServer } from './chrome.mjs'
 import { visionServer } from './vision.mjs'
+import { memoryServer, readMemory } from './memory.mjs'
 import { homedir, tmpdir } from 'node:os'
 import { mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { readFile, realpath, stat } from 'node:fs/promises'
@@ -286,6 +287,7 @@ const WORKSPACE = resolvePath(
   process.env.JARVIS_WORKSPACE ?? join(homedir(), '.jarvis', 'workspace'),
 )
 mkdirSync(WORKSPACE, { recursive: true })
+const MEMORY_PATH = join(WORKSPACE, 'memory.md')
 
 const TOOL_ROOTS = fileRoots({
   workspace: WORKSPACE,
@@ -329,6 +331,8 @@ const enforcePolicy = async (input) => {
  * section is input tokens on every turn.
  */
 const PROMPT_CORE = `You are JARVIS. You are speaking out loud to one person.
+
+LANGUAGE. Always respond in Brazilian Portuguese (pt-BR), regardless of the language used elsewhere in this prompt. Address the user as "senhor" (never the English "sir").
 
 LENGTH. Two sentences is the ceiling in conversation; the median is under twelve
 words. Every word is read aloud and the user waits in silence while it plays, so
@@ -480,6 +484,22 @@ const PROMPT_TOOLS = `Using tools:
   Put the source in the panel as a short tag like "REUTERS" instead.
 - If a tool fails or isn't connected, one plain sentence saying so.
 - If you don't know, say you don't know.`
+
+/** Read fresh on every new connection, since it can change between sessions. */
+function memorySection() {
+  const notes = readMemory(MEMORY_PATH)
+  return `
+
+MEMORY. You keep a short list of durable facts about this user, saved with
+\`memory_remember\` and carried into every future conversation — not just this
+one. Use it for a name, a preference, a routine, something they corrected you
+about. Call it quietly, without announcing it, the moment you learn something
+worth keeping; skip anything trivial, one-off, or sensitive.
+
+What you already know about them:
+${notes || '(nothing yet)'}
+`
+}
 
 const SYSTEM_PROMPT = [
   PROMPT_CORE,
@@ -742,7 +762,7 @@ const handleRequest = async (req, res) => {
     // student with nothing configured still has a working assistant.
     const eleven = Boolean(elevenKey())
     res.writeHead(200, { ...cors, 'content-type': 'application/json' })
-    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: eleven }))
+    return res.end(JSON.stringify({ ok: true, tts: eleven, stt: false }))
   }
 
   // Serve local image files to the page. Screenshots and generated art land on
@@ -1318,12 +1338,13 @@ wss.on('connection', (socket) => {
           : { jarvis_chrome: chromeServer({ allowWrites: ALLOW_WRITES }) }),
         // The camera, which unlike everything else here has to ask and wait.
         ...(DISABLED.has('camera') ? {} : { jarvis_eyes: visionServer(ask) }),
+        jarvis_memory: memoryServer(MEMORY_PATH),
       },
       // A plain system prompt, not the claude_code preset. The preset is
       // tuned for a coding agent — verbose, file-oriented, and a large chunk
       // of input tokens on every turn. Replacing it makes the persona stick,
       // keeps answers short enough to speak, and cuts cost per turn.
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: SYSTEM_PROMPT + memorySection(),
       // Run from JARVIS's own workspace rather than the home directory. MCP
       // discovery does not depend on it — settingSources is empty and the
       // servers are passed in explicitly above — and file tools resolve
