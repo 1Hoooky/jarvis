@@ -240,6 +240,10 @@ type State = {
   expandedBlade: string | null
   /** JARVIS's control over his own appearance. UI_DEFAULTS == the stock look. */
   ui: UiState
+  /** A typed message waiting to be spoken as a turn, for the text-input fallback
+   *  when the microphone is unavailable (e.g. a remote desktop session). Set by
+   *  the HUD's text box, consumed and cleared by App once the turn starts. */
+  pendingTextInput: string | null
 
   setVoice: (v: string) => void
   setGestures: (on: boolean) => void
@@ -257,6 +261,8 @@ type State = {
   setCaption: (c: string) => void
   setActiveTool: (t: string | null) => void
   setError: (e: string | null) => void
+  submitTextInput: (text: string) => void
+  clearTextInput: () => void
   setConnected: (c: string[]) => void
   pushTurn: (t: Turn) => void
   appendToLastTurn: (text: string) => void
@@ -272,6 +278,7 @@ type State = {
 
 export const useStore = create<State>((set) => ({
   phase: 'offline',
+  pendingTextInput: null,
   level: 0,
   caption: '',
   turns: [],
@@ -351,6 +358,8 @@ export const useStore = create<State>((set) => ({
   setCaption: (caption) => set({ caption }),
   setActiveTool: (activeTool) => set({ activeTool }),
   setError: (error) => set({ error }),
+  submitTextInput: (text) => set({ pendingTextInput: text }),
+  clearTextInput: () => set({ pendingTextInput: null }),
   setConnected: (connected) => set({ connected }),
   pushTurn: (turn) => set((s) => ({ turns: [...s.turns.slice(-40), turn] })),
   appendToLastTurn: (text) =>

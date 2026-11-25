@@ -4,6 +4,7 @@ import { Hud } from './ui/Hud'
 import { Boot } from './ui/Boot'
 import { Ignition } from './ui/Ignition'
 import { Diagnostics } from './ui/Diagnostics'
+import { ChatInput } from './ui/ChatInput'
 import { useStore } from './store'
 import { startVoice, type Voice, type VoiceMode } from './lib/voice'
 import { createSpeaker, cycleVoice, currentVoiceName } from './lib/tts'
@@ -215,6 +216,21 @@ export default function App() {
         // the difference between a conversation and a vending machine.
         listen(FOLLOW_UP_MS)
       }
+    }
+  }
+
+  // -- typed chat ------------------------------------------------------------
+
+  const sendChat = (text: string) => {
+    const t = text.trim()
+    if (!t) return
+    const ph = store.getState().phase
+    if (ph === 'offline') {
+      void powerOn().then(() => respond(t))
+    } else if (ph === 'boot') {
+      return
+    } else {
+      void respond(t)
     }
   }
 
@@ -704,6 +720,7 @@ export default function App() {
       <Boot />
       <Diagnostics />
       <Ignition onStart={() => void powerOn()} />
+      <ChatInput onSend={sendChat} disabled={phase === 'boot'} />
     </>
   )
 }
